@@ -1,0 +1,306 @@
+C51 COMPILER V8.16   PROJEKAT                                                              01/10/2023 15:29:03 PAGE 1   
+
+
+C51 COMPILER V8.16, COMPILATION OF MODULE PROJEKAT
+OBJECT MODULE PLACED IN projekat.OBJ
+COMPILER INVOKED BY: D:\Keil\C51\BIN\C51.EXE projekat.c BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          #include "display.c"
+   2          
+   3          //Serijska komunikacija
+   4          char * ok = "OK\r\n";
+   5          char * greska = "ERROR\r\n";
+   6          char * pokZaSlanje;
+   7          char buffer[10];
+   8          char buffer_it = 0;
+   9          
+  10          //Timer
+  11          int brojacPrekida = 0;
+  12          unsigned char sekunda = 0;
+  13          
+  14          //ON-OF
+  15          unsigned char start = 0;
+  16          
+  17          //Izbor mod-a
+  18          unsigned char mod = 1; // 1-Brojanje nitni, 2-Pomeranje gramofona
+  19          unsigned char modEn = 0; // Prvi mod nece raditi dok mu ne damo odgovarajuci broj nitni za brojanje
+  20          unsigned char flag = 0; //Flag koji nam govori da li je i jedan mod izvrsen od starta uredjaja
+  21          
+  22          //Broj nitne
+  23          unsigned char nitneZaPomeraj = 0;
+  24          unsigned char trenutniPomeraj = 0;
+  25          
+  26          //Ulazi sa gramofona
+  27          unsigned char brojacZaTaster1 = 0; //Naisao na nitnu
+  28          unsigned char trenutno_hardversko_stanje_P0_0 = 1;
+  29          unsigned char prethodno_hardversko_stanje_P0_0 = 1;
+  30          unsigned char trenutno_softversko_P0_0 = 1;
+  31          
+  32          unsigned char brojacZaTaster2 = 0; //Napravio pun krug
+  33          unsigned char trenutno_hardversko_stanje_P0_1 = 1;
+  34          unsigned char prethodno_hardversko_stanje_P0_1 = 1;
+  35          unsigned char trenutno_softversko_P0_1 = 1;
+  36          
+  37          void timer1_interrupt(void) interrupt 3 {
+  38   1        TL1 = 0x48;
+  39   1        TH1 = 0x48;
+  40   1      
+  41   1        if (++brojacPrekida == 5000) {
+  42   2          if (start) {
+  43   3            sekunda++;
+  44   3            if (sekunda == 60) {
+  45   4              sekunda = 0;
+  46   4            }
+  47   3          }
+  48   2          brojacPrekida = 0;
+  49   2        }
+  50   1      
+  51   1        //Debounce za ulaz sa gramofona
+  52   1        trenutno_hardversko_stanje_P0_0 = P0_0;
+  53   1        if (trenutno_hardversko_stanje_P0_0 == prethodno_hardversko_stanje_P0_0) {
+  54   2          if (++brojacZaTaster1 == 5) {
+  55   3            trenutno_softversko_P0_0 = trenutno_hardversko_stanje_P0_0;
+C51 COMPILER V8.16   PROJEKAT                                                              01/10/2023 15:29:03 PAGE 2   
+
+  56   3            brojacZaTaster1 = 0;
+  57   3          }
+  58   2        } else {
+  59   2          brojacZaTaster1 = 0;
+  60   2        }
+  61   1        prethodno_hardversko_stanje_P0_0 = trenutno_hardversko_stanje_P0_0;
+  62   1      
+  63   1        trenutno_hardversko_stanje_P0_1 = P0_1;
+  64   1        if (trenutno_hardversko_stanje_P0_1 == prethodno_hardversko_stanje_P0_1) {
+  65   2          if (++brojacZaTaster2 == 5) {
+  66   3            trenutno_softversko_P0_1 = trenutno_hardversko_stanje_P0_1;
+  67   3            brojacZaTaster2 = 0;
+  68   3          }
+  69   2        } else {
+  70   2          brojacZaTaster2 = 0;
+  71   2        }
+  72   1        prethodno_hardversko_stanje_P0_1 = trenutno_hardversko_stanje_P0_1;
+  73   1      
+  74   1      }
+  75          
+  76          void parsiraj_poruku() {
+  77   1        if (buffer[0] == '(' && buffer[1] == 'S' && buffer[2] == 'T' && buffer[3] == 'A' && buffer[4] == 'R' && 
+             -buffer[5] == 'T' && buffer[6] == ')') {
+  78   2          start = 1;
+  79   2          pokZaSlanje = ok;
+  80   2          flag = 0;
+  81   2        } else if (buffer[0] == '(' && buffer[1] == 'S' && buffer[2] == 'T' && buffer[3] == 'O' && buffer[4] == 
+             -'P' && buffer[5] == ')') {
+  82   2          start = 0;
+  83   2          pokZaSlanje = ok;
+  84   2          mod = 1;
+  85   2          sekunda = 0;
+  86   2          trenutniPomeraj = 0;
+  87   2          modEn = 0;
+  88   2          nitneZaPomeraj = 0;
+  89   2          flag = 0;
+  90   2        } else if (buffer[0] == '(' && buffer[1] == 'M' && buffer[2] == ':' && buffer[4] == ')') {
+  91   2          if (buffer[3] == '1') {
+  92   3            pokZaSlanje = ok;
+  93   3            mod = 1;
+  94   3            sekunda = 0;
+  95   3            trenutniPomeraj = 0;
+  96   3            nitneZaPomeraj = 0;
+  97   3            flag = 0;
+  98   3          } else if (buffer[3] == '2') {
+  99   3            pokZaSlanje = ok;
+ 100   3            mod = 2;
+ 101   3            modEn = 0;
+ 102   3          } else {
+ 103   3            pokZaSlanje = greska;
+ 104   3          }
+ 105   2        } else if ((buffer[0] == '(' && buffer[1] == 'B' && buffer[2] == ':' && buffer[4] == ')') && (mod == 2))
+             - {
+ 106   2          sekunda = 0;
+ 107   2          trenutniPomeraj = 0;
+ 108   2          nitneZaPomeraj = buffer[3] -= 48;
+ 109   2          pokZaSlanje = ok;
+ 110   2          modEn = 1;
+ 111   2          flag = 0;
+ 112   2        } else {
+ 113   2          pokZaSlanje = greska;
+ 114   2        }
+C51 COMPILER V8.16   PROJEKAT                                                              01/10/2023 15:29:03 PAGE 3   
+
+ 115   1        SBUF = * pokZaSlanje;
+ 116   1        buffer[0] = '\0';
+ 117   1        buffer_it = 0;
+ 118   1      }
+ 119          
+ 120          void serijski_prekid(void) interrupt 4 {
+ 121   1        if (RI) {
+ 122   2          char prijem;
+ 123   2          RI = 0;
+ 124   2          prijem = SBUF;
+ 125   2      
+ 126   2          if (prijem == '(') {
+ 127   3            buffer_it = 0;
+ 128   3          }
+ 129   2      
+ 130   2          buffer[buffer_it] = prijem;
+ 131   2          buffer_it = (buffer_it + 1) % 10;
+ 132   2      
+ 133   2          if (prijem == ')') {
+ 134   3            parsiraj_poruku();
+ 135   3          }
+ 136   2        }
+ 137   1        if (TI) {
+ 138   2          TI = 0;
+ 139   2      
+ 140   2          pokZaSlanje++;
+ 141   2          if ( * pokZaSlanje != '\0') {
+ 142   3            SBUF = * pokZaSlanje;
+ 143   3          }
+ 144   2        }
+ 145   1      }
+ 146          
+ 147          char * num2str(int broj) {
+ 148   1        unsigned int i = 0;
+ 149   1        unsigned int j;
+ 150   1        unsigned int ostatak;
+ 151   1        unsigned int len = 0;
+ 152   1        unsigned int lenstr = 0;
+ 153   1        char str[8];
+ 154   1        char pom[8];
+ 155   1        while (broj != 0) {
+ 156   2          ostatak = broj % 10;
+ 157   2          broj = broj / 10;
+ 158   2          pom[i] = ostatak + 48;
+ 159   2          len++;
+ 160   2          i++;
+ 161   2        }
+ 162   1        pom[len] = '\0';
+ 163   1        lenstr = len;
+ 164   1        j = len - 1;
+ 165   1        for (i = 0; i < lenstr; i++, j--) {
+ 166   2          str[i] = pom[j];
+ 167   2        }
+ 168   1        str[lenstr] = '\0';
+ 169   1        return str;
+ 170   1      }
+ 171          
+ 172          void main(void) {
+ 173   1      
+ 174   1        //Ulaz sa gramofona
+ 175   1        unsigned char trenutno_stanje_P0_0 = 1;
+ 176   1        unsigned char prethodno_stanje_P0_0 = 1;
+C51 COMPILER V8.16   PROJEKAT                                                              01/10/2023 15:29:03 PAGE 4   
+
+ 177   1        unsigned char trenutno_stanje_P0_1 = 1;
+ 178   1        unsigned char prethodno_stanje_P0_1 = 1;
+ 179   1      
+ 180   1        //Tajmer 0 
+ 181   1        TL1 = 0x48;
+ 182   1        TH1 = 0x48;
+ 183   1        TMOD = 0x20;
+ 184   1        TR1 = 1;
+ 185   1        ET1 = 1;
+ 186   1      
+ 187   1        //Serijska komunikacija
+ 188   1        PCON &= 0x80;
+ 189   1        BRL = 253;
+ 190   1        SCON = 0x50;
+ 191   1        BDRCON |= 0x1C;
+ 192   1      
+ 193   1        ES = 1;
+ 194   1        EA = 1;
+ 195   1      
+ 196   1        start = 0;
+ 197   1        mod = 1;
+ 198   1      
+ 199   1        initDisplay();
+ 200   1        while (1) {
+ 201   2      
+ 202   2          if (start) {
+ 203   3            //Rising edge za ulaz sa gramofona
+ 204   3                P2_0 = 0;
+ 205   3            trenutno_stanje_P0_0 = trenutno_softversko_P0_0; //Naisao na nitnu
+ 206   3            if (trenutno_stanje_P0_0 > prethodno_stanje_P0_0) {
+ 207   4              trenutniPomeraj += 1;
+ 208   4            }
+ 209   3            if ((mod == 2) && (modEn == 1)) {
+ 210   4              if (flag == 0) {
+ 211   5                clearDisplay();
+ 212   5                writeLine("MOD 2");
+ 213   5              }
+ 214   4      
+ 215   4              if (trenutniPomeraj == nitneZaPomeraj) {
+ 216   5                //Ispis vremena za koje se uredjaj pomerao
+ 217   5                clearDisplay();
+ 218   5                //writeLine("MOD 2");
+ 219   5                writeLine("STOP2");
+ 220   5                newLine();
+ 221   5                writeLine(num2str(sekunda));
+ 222   5                trenutniPomeraj = 0;
+ 223   5                sekunda = 0;
+ 224   5                flag = 1;
+ 225   5                start = 0;
+ 226   5                mod = 1;
+ 227   5                modEn = 0;
+ 228   5                nitneZaPomeraj = 0;
+ 229   5      
+ 230   5              }
+ 231   4            }
+ 232   3      
+ 233   3            trenutno_stanje_P0_1 = trenutno_softversko_P0_1; //Napravio pun krug
+ 234   3            if (mod == 1) {
+ 235   4              if (flag == 0) {
+ 236   5                clearDisplay();
+ 237   5                writeLine("MOD 1");
+ 238   5              }
+C51 COMPILER V8.16   PROJEKAT                                                              01/10/2023 15:29:03 PAGE 5   
+
+ 239   4              if (trenutno_stanje_P0_1 > prethodno_stanje_P0_1) {
+ 240   5                //Ispis broja nitni i vremena posle kruga motora
+ 241   5                clearDisplay();
+ 242   5                //writeLine("MOD 1");
+ 243   5                writeLine("STOP1");
+ 244   5                writeLine(num2str(trenutniPomeraj));
+ 245   5                newLine();
+ 246   5                writeLine(num2str(sekunda));
+ 247   5                trenutniPomeraj = 0;
+ 248   5                sekunda = 0;
+ 249   5                flag = 1;
+ 250   5                start = 0;
+ 251   5                mod = 1;
+ 252   5                modEn = 0;
+ 253   5                nitneZaPomeraj = 0;
+ 254   5              }
+ 255   4            }
+ 256   3      
+ 257   3          } else {
+ 258   3                P2_0 = 1;
+ 259   3            sekunda = 0;
+ 260   3                if(flag == 0)
+ 261   3                {
+ 262   4              clearDisplay();
+ 263   4              writeLine("STOP");
+ 264   4                }
+ 265   3          }
+ 266   2      
+ 267   2          prethodno_stanje_P0_0 = trenutno_stanje_P0_0;
+ 268   2          prethodno_stanje_P0_1 = trenutno_stanje_P0_1;
+ 269   2      
+ 270   2        }
+ 271   1      
+ 272   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1334    ----
+   CONSTANT SIZE    =     42    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     37      31
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----       1
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
